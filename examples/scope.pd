@@ -1,0 +1,16 @@
+// Test nested scopes and variable shadowing
+fn main() {
+    let x = 10;
+    print(x);
+    {
+        let x = 20;
+        print(x);
+        {
+            let x = 30;
+            print(x);
+        }
+        print(x);
+    }
+    print(x);
+    return 0;
+}

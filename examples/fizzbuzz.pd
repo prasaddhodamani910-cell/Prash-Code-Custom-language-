@@ -1,0 +1,25 @@
+// FizzBuzz - print numbers, but:
+//   multiples of 3: print -3
+//   multiples of 5: print -5  
+//   multiples of both: print -15
+//   otherwise: print the number
+fn main() {
+    let i = 1;
+    while (i <= 30) {
+        if (i % 15 == 0) {
+            print(-15);
+        } else {
+            if (i % 3 == 0) {
+                print(-3);
+            } else {
+                if (i % 5 == 0) {
+                    print(-5);
+                } else {
+                    print(i);
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return 0;
+}

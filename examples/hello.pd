@@ -1,0 +1,5 @@
+// Our first Prash code program!
+fn main() {
+    print(42);
+    return 0;
+}

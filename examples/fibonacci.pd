@@ -1,0 +1,16 @@
+// Compute Fibonacci numbers
+fn fib(n) {
+    if (n <= 1) {
+        return n;
+    }
+    return fib(n - 1) + fib(n - 2);
+}
+
+fn main() {
+    let i = 0;
+    while (i < 15) {
+        print(fib(i));
+        i = i + 1;
+    }
+    return 0;
+}
