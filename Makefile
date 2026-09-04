@@ -27,14 +27,4 @@ clean:
 	rm -rf $(BUILDDIR) examples/*.s hello fib fact fizzbuzz scope a.out
 
 test: all
-	@echo "=== hello.pd ==="
-	@./$(TARGET) examples/hello.pd -o hello && ./hello
-	@echo "=== fibonacci.pd ==="
-	@./$(TARGET) examples/fibonacci.pd -o fib && ./fib
-	@echo "=== factorial.pd ==="
-	@./$(TARGET) examples/factorial.pd -o fact && ./fact
-	@echo "=== fizzbuzz.pd ==="
-	@./$(TARGET) examples/fizzbuzz.pd -o fizzbuzz && ./fizzbuzz
-	@echo "=== scope.pd ==="
-	@./$(TARGET) examples/scope.pd -o scope && ./scope
-	@echo "=== ALL TESTS PASSED ==="
+	bash run_tests.sh
