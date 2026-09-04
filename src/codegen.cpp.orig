@@ -258,9 +258,9 @@ void CodeGen::generateBlock(Block* block) {
 
 void CodeGen::generateStmt(Stmt* stmt) {
     if (auto assignStmt = dynamic_cast<AssignStmt*>(stmt)) {
-        
+        std::cerr << "Assign " << assignStmt->name << " isDecl=" << assignStmt->isDeclaration << "\n";
         if (auto arrLit = dynamic_cast<ArrayLiteral*>(assignStmt->value.get())) {
-            
+            std::cerr << "IS ARRAY LITERAL! name=" << assignStmt->name << "\n";
             if (assignStmt->isDeclaration) {
                 int n = arrLit->elements.size();
                 int totalBytes = (n * 8 + 15) & ~15;
@@ -287,8 +287,9 @@ void CodeGen::generateStmt(Stmt* stmt) {
         } else {
             std::string reg = generateExpr(assignStmt->value.get());
             if (assignStmt->isDeclaration) {
-                push(reg);
                 declareVar(assignStmt->name);
+                int offset = getVarOffset(assignStmt->name);
+                emit("str " + reg + ", [x29, #" + std::to_string(offset) + "]");
             } else {
                 int offset = getVarOffset(assignStmt->name);
                 emit("str " + reg + ", [x29, #" + std::to_string(offset) + "]");
@@ -386,22 +387,10 @@ std::string CodeGen::generateExpr(Expr* expr) {
         emit("add " + reg + ", " + reg + ", :lo12:" + label);
         return reg;
     } else if (auto id = dynamic_cast<Identifier*>(expr)) {
-        const VarInfo* info = getVarInfo(id->name);
         std::string reg = allocReg();
-        if (info->isArray) {
-            emit("sub " + reg + ", x29, #" + std::to_string(-info->offset));
-        } else {
-            emit("ldr " + reg + ", [x29, #" + std::to_string(info->offset) + "]");
-        }
+        int offset = getVarOffset(id->name);
+        emit("ldr " + reg + ", [x29, #" + std::to_string(offset) + "]");
         return reg;
-    } else if (auto idxExpr = dynamic_cast<IndexExpr*>(expr)) {
-        std::string arrReg = generateExpr(idxExpr->array.get());
-        std::string idxReg = generateExpr(idxExpr->index.get());
-        std::string resReg = allocReg();
-        emit("ldr " + resReg + ", [" + arrReg + ", " + idxReg + ", lsl #3]");
-        freeReg(arrReg);
-        freeReg(idxReg);
-        return resReg;
     } else if (auto binExpr = dynamic_cast<BinaryExpr*>(expr)) {
         if (binExpr->op == TokenType::AND) {
             std::string reg = generateExpr(binExpr->left.get());

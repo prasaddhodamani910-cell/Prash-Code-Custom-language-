@@ -1,0 +1,6 @@
+def main():
+    row0 = [1, 2]
+    row1 = [3, 4]
+    matrix = [row0, row1]
+    print(matrix[1][0])
+    return 0

@@ -135,6 +135,10 @@ StmtPtr Parser::parseExprStmtOrAssign() {
             ExprPtr value = parseExpression();
             consume(TokenType::NEWLINE, "Expected newline after assignment");
             return std::make_unique<AssignStmt>(id->name, std::move(value), loc);
+        } else if (auto idx = dynamic_cast<IndexExpr*>(expr.get())) {
+            ExprPtr value = parseExpression();
+            consume(TokenType::NEWLINE, "Expected newline after assignment");
+            return std::make_unique<IndexAssignStmt>(std::move(idx->array), std::move(idx->index), std::move(value), loc);
         } else {
             m_reporter.error(loc, "Invalid assignment target");
         }
@@ -233,13 +237,19 @@ ExprPtr Parser::parseCall() {
                 } while (match(TokenType::COMMA));
             }
             consume(TokenType::RPAREN, "Expected ')' after arguments");
-            return std::make_unique<CallExpr>(callee, std::move(args), loc);
+            expr = std::make_unique<CallExpr>(callee, std::move(args), loc);
         } else {
             m_reporter.error(loc, "Can only call functions");
             while (!check(TokenType::RPAREN) && !check(TokenType::END_OF_FILE)) advance();
             if (check(TokenType::RPAREN)) advance();
-            return expr;
         }
+    }
+    
+    while (match(TokenType::LBRACKET)) {
+        Location loc = previous().loc;
+        ExprPtr index = parseExpression();
+        consume(TokenType::RBRACKET, "Expected ']' after index");
+        expr = std::make_unique<IndexExpr>(std::move(expr), std::move(index), loc);
     }
     
     return expr;
@@ -265,6 +275,18 @@ ExprPtr Parser::parsePrimary() {
         ExprPtr expr = parseExpression();
         consume(TokenType::RPAREN, "Expected ')' after expression");
         return expr;
+    }
+
+    if (match(TokenType::LBRACKET)) {
+        Location loc = previous().loc;
+        std::vector<ExprPtr> elements;
+        if (!check(TokenType::RBRACKET)) {
+            do {
+                elements.push_back(parseExpression());
+            } while (match(TokenType::COMMA));
+        }
+        consume(TokenType::RBRACKET, "Expected ']' after array elements");
+        return std::make_unique<ArrayLiteral>(std::move(elements), loc);
     }
     
     m_reporter.error(peek().loc, "Expected expression");

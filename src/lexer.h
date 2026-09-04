@@ -17,7 +17,7 @@ enum class TokenType {
     AND, OR, NOT,
 
     // Punctuation
-    LPAREN, RPAREN, COMMA, COLON,
+    LPAREN, RPAREN, LBRACKET, RBRACKET, COMMA, COLON,
 
     // Literals & Identifiers
     INTEGER, STRING, IDENTIFIER,

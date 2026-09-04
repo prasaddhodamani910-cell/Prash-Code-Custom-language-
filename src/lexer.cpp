@@ -32,6 +32,8 @@ const char* tokenTypeToString(TokenType type) {
         case TokenType::NOT: return "NOT";
         case TokenType::LPAREN: return "LPAREN";
         case TokenType::RPAREN: return "RPAREN";
+        case TokenType::LBRACKET: return "LBRACKET";
+        case TokenType::RBRACKET: return "RBRACKET";
         case TokenType::COMMA: return "COMMA";
         case TokenType::COLON: return "COLON";
         case TokenType::INTEGER: return "INTEGER";
@@ -188,6 +190,8 @@ std::vector<Token> Lexer::tokenize() {
         switch (c) {
             case '(': tokens.push_back(makeToken(TokenType::LPAREN)); break;
             case ')': tokens.push_back(makeToken(TokenType::RPAREN)); break;
+            case '[': tokens.push_back(makeToken(TokenType::LBRACKET)); break;
+            case ']': tokens.push_back(makeToken(TokenType::RBRACKET)); break;
             case ',': tokens.push_back(makeToken(TokenType::COMMA)); break;
             case ':': tokens.push_back(makeToken(TokenType::COLON)); break;
             case '+': tokens.push_back(makeToken(TokenType::PLUS)); break;

@@ -25,9 +25,18 @@ private:
     // Stack and scope management
     void push(const std::string& reg = "x0");
     void pop(const std::string& reg = "x0");
+    struct VarInfo {
+        int offset;
+        int scopeDepth;
+        bool isArray;
+        int arraySize;
+        VarInfo(int o, int s, bool a, int sz) : offset(o), scopeDepth(s), isArray(a), arraySize(sz) {}
+        VarInfo(int o, int s) : offset(o), scopeDepth(s), isArray(false), arraySize(0) {}
+    };
     void enterScope();
     void leaveScope();
     int getVarOffset(const std::string& name);
+    const VarInfo* getVarInfo(const std::string& name);
     void declareVar(const std::string& name);
     
     std::string allocReg();
@@ -39,14 +48,11 @@ private:
     std::string m_outputFile;
     std::ofstream m_out;
     
-    struct VarInfo {
-        int offset; // offset from FP
-        int scopeDepth;
-    };
+
     std::unordered_map<std::string, std::vector<VarInfo>> m_variables;
     
     struct Scope {
-        int numVars = 0;
+        int totalBytes = 0;
     };
     std::vector<Scope> m_scopes;
     

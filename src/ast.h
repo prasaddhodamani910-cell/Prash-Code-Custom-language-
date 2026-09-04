@@ -101,6 +101,28 @@ struct CallExpr : public Expr {
     }
 };
 
+struct ArrayLiteral : public Expr {
+    std::vector<ExprPtr> elements;
+    ArrayLiteral(std::vector<ExprPtr> els, Location l) : elements(std::move(els)) { loc = l; }
+    void dump(int indent) const override {
+        std::cout << std::string(indent, ' ') << "ArrayLiteral\n";
+        for (const auto& el : elements) {
+            el->dump(indent + 2);
+        }
+    }
+};
+
+struct IndexExpr : public Expr {
+    ExprPtr array;
+    ExprPtr index;
+    IndexExpr(ExprPtr a, ExprPtr i, Location l) : array(std::move(a)), index(std::move(i)) { loc = l; }
+    void dump(int indent) const override {
+        std::cout << std::string(indent, ' ') << "IndexExpr\n";
+        array->dump(indent + 2);
+        index->dump(indent + 2);
+    }
+};
+
 // Statements
 struct Stmt {
     virtual ~Stmt() = default;
@@ -116,6 +138,20 @@ struct AssignStmt : public Stmt {
         : name(std::move(n)), value(std::move(v)) { loc = l; }
     void dump(int indent) const override {
         std::cout << std::string(indent, ' ') << "AssignStmt(" << name << ")\n";
+        value->dump(indent + 2);
+    }
+};
+
+struct IndexAssignStmt : public Stmt {
+    ExprPtr array;
+    ExprPtr index;
+    ExprPtr value;
+    IndexAssignStmt(ExprPtr a, ExprPtr i, ExprPtr v, Location l)
+        : array(std::move(a)), index(std::move(i)), value(std::move(v)) { loc = l; }
+    void dump(int indent) const override {
+        std::cout << std::string(indent, ' ') << "IndexAssignStmt\n";
+        array->dump(indent + 2);
+        index->dump(indent + 2);
         value->dump(indent + 2);
     }
 };

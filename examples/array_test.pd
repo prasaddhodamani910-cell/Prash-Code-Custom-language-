@@ -1,0 +1,5 @@
+def main():
+    arr = [10, 20, 30]
+    arr[1] = 99
+    print(arr[0] + arr[1] + arr[2])
+    return 0

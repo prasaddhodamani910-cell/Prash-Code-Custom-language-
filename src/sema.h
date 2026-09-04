@@ -26,6 +26,7 @@ private:
 
     ErrorReporter& m_reporter;
     std::vector<std::unordered_set<std::string>> m_scopes;
+    std::vector<std::unordered_map<std::string, int>> m_arraySizes;
     std::unordered_map<std::string, int> m_functions; // name -> param count
     bool m_inFunction = false;
 };
