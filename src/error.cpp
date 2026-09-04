@@ -7,6 +7,11 @@ ErrorReporter::ErrorReporter(std::string_view source, std::string_view filename)
     : m_source(source), m_filename(filename) {}
 
 void ErrorReporter::error(Location loc, std::string_view message) {
+    if (loc.line == m_lastErrorLoc.line && loc.column == m_lastErrorLoc.column && message == m_lastErrorMessage) {
+        return; // Suppress duplicate
+    }
+    m_lastErrorLoc = loc;
+    m_lastErrorMessage = std::string(message);
     report(loc, message, "error", "\033[31m"); // Red
     m_hasErrors = true;
 }

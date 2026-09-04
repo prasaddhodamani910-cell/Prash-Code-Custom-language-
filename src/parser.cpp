@@ -32,6 +32,9 @@ std::unique_ptr<FnDecl> Parser::parseFnDecl() {
     std::vector<std::string> params;
     if (!check(TokenType::RPAREN)) {
         do {
+            if (params.size() >= 8) {
+                m_reporter.error(peek().loc, "Cannot have more than 8 parameters");
+            }
             params.push_back(std::string(consume(TokenType::IDENTIFIER, "Expected parameter name").text));
         } while (match(TokenType::COMMA));
     }
@@ -296,6 +299,7 @@ void Parser::synchronize() {
     advance();
     while (!check(TokenType::END_OF_FILE)) {
         if (previous().type == TokenType::NEWLINE) return;
+        if (check(TokenType::DEDENT)) return;
         switch (peek().type) {
             case TokenType::DEF:
             case TokenType::IF:

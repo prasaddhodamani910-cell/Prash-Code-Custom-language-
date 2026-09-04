@@ -16,18 +16,14 @@ This is a complete toy programming language compiler that generates native AArch
 ### Examples
 
 **Fibonacci:**
-```
-fn fib(n) {
-    if (n <= 1) {
-        return n;
-    }
-    return fib(n - 1) + fib(n - 2);
-}
+def fib(n):
+    if n <= 1:
+        return n
+    return fib(n - 1) + fib(n - 2)
 
-fn main() {
-    print(fib(10));
-    return 0;
-}
+def main():
+    print(fib(10))
+    return 0
 ```
 
 ## Build Instructions

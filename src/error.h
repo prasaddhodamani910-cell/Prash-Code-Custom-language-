@@ -25,6 +25,8 @@ private:
     std::string_view m_source;
     std::string_view m_filename;
     bool m_hasErrors = false;
+    Location m_lastErrorLoc{0, 0};
+    std::string m_lastErrorMessage;
 };
 
 } // namespace toy

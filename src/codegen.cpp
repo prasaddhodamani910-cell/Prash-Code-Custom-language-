@@ -168,13 +168,13 @@ void CodeGen::generateFnDecl(FnDecl* fn) {
     emit("mov x0, #0");
     emitLabel(".L" + m_currentFunction + "_end");
     
+    leaveScope();
+
     // Epilogue
     emit("mov sp, x29");
     emit("ldp x29, x30, [sp], #16");
     emit("ret");
     m_out << "\n";
-    
-    leaveScope();
 }
 
 void CodeGen::generateBlock(Block* block) {
