@@ -1,0 +1,30 @@
+--- src/codegen.h
++++ src/codegen.h
+@@ -16,7 +16,7 @@
+     void generateFnDecl(FnDecl* fn);
+     void generateBlock(Block* block);
+     void generateStmt(Stmt* stmt);
+-    void generateExpr(Expr* expr);
++    std::string generateExpr(Expr* expr);
+     
+     // Output helpers
+     void emit(const std::string& instr);
+@@ -29,6 +29,9 @@
+     void leaveScope();
+     int getVarOffset(const std::string& name);
+     void declareVar(const std::string& name);
++    
++    std::string allocReg();
++    void freeReg(const std::string& reg);
+ 
+     int m_labelCounter = 0;
+     std::string newLabel();
+@@ -50,6 +53,8 @@
+     int m_scopeDepth = 0;
+     int m_currentFpOffset = 0;
+     std::string m_currentFunction;
++    
++    bool m_freeRegisters[10] = {true, true, true, true, true, true, true, true, true, true}; // x19 to x28
+ };
+ 
+ } // namespace toy

@@ -75,6 +75,8 @@ void Sema::visitStmt(Stmt* stmt) {
         }
     } else if (auto printStmt = dynamic_cast<PrintStmt*>(stmt)) {
         visitExpr(printStmt->value.get());
+    } else if (auto printStrStmt = dynamic_cast<PrintStrStmt*>(stmt)) {
+        visitExpr(printStrStmt->value.get());
     } else if (auto exprStmt = dynamic_cast<ExprStmt*>(stmt)) {
         visitExpr(exprStmt->expr.get());
     } else if (auto blockStmt = dynamic_cast<Block*>(stmt)) {

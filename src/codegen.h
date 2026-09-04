@@ -55,6 +55,8 @@ private:
     std::string m_currentFunction;
     
     bool m_freeRegisters[10] = {true, true, true, true, true, true, true, true, true, true}; // x19 to x28
+    
+    std::vector<std::string> m_strings;
 };
 
 } // namespace toy

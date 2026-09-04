@@ -21,6 +21,7 @@ private:
     StmtPtr parseWhileStmt();
     StmtPtr parseReturnStmt();
     StmtPtr parsePrintStmt();
+    StmtPtr parsePrintStrStmt();
     StmtPtr parseExprStmtOrAssign();
 
     ExprPtr parseExpression();

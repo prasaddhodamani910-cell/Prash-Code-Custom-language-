@@ -64,6 +64,7 @@ StmtPtr Parser::parseStatement() {
     if (match(TokenType::WHILE)) return parseWhileStmt();
     if (match(TokenType::RETURN)) return parseReturnStmt();
     if (match(TokenType::PRINT)) return parsePrintStmt();
+    if (match(TokenType::PRINT_STR)) return parsePrintStrStmt();
     
     return parseExprStmtOrAssign();
 }
@@ -114,6 +115,15 @@ StmtPtr Parser::parsePrintStmt() {
     consume(TokenType::RPAREN, "Expected ')' after print argument");
     consume(TokenType::NEWLINE, "Expected newline after print statement");
     return std::make_unique<PrintStmt>(std::move(value), loc);
+}
+
+StmtPtr Parser::parsePrintStrStmt() {
+    Location loc = previous().loc;
+    consume(TokenType::LPAREN, "Expected '(' after 'print_str'");
+    ExprPtr value = parseExpression();
+    consume(TokenType::RPAREN, "Expected ')' after print_str argument");
+    consume(TokenType::NEWLINE, "Expected newline after print_str statement");
+    return std::make_unique<PrintStrStmt>(std::move(value), loc);
 }
 
 StmtPtr Parser::parseExprStmtOrAssign() {
@@ -243,6 +253,10 @@ ExprPtr Parser::parsePrimary() {
         return std::make_unique<IntLiteral>(previous().int_val, previous().loc);
     }
     
+    if (match(TokenType::STRING)) {
+        return std::make_unique<StringLiteral>(previous().str_val, previous().loc);
+    }
+    
     if (match(TokenType::IDENTIFIER)) {
         return std::make_unique<Identifier>(std::string(previous().text), previous().loc);
     }
@@ -278,7 +292,7 @@ Token Parser::advance() {
 Token Parser::peek() const {
     if (m_current >= m_tokens.size()) {
         if (!m_tokens.empty()) return m_tokens.back();
-        return Token{TokenType::END_OF_FILE, "", {0, 0}, 0};
+        return Token{TokenType::END_OF_FILE, "", {0, 0}, 0, ""};
     }
     return m_tokens[m_current];
 }
@@ -306,6 +320,7 @@ void Parser::synchronize() {
             case TokenType::WHILE:
             case TokenType::RETURN:
             case TokenType::PRINT:
+            case TokenType::PRINT_STR:
                 return;
             default:
                 break;

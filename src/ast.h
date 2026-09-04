@@ -40,6 +40,14 @@ struct IntLiteral : public Expr {
     }
 };
 
+struct StringLiteral : public Expr {
+    std::string value;
+    StringLiteral(std::string v, Location l) : value(std::move(v)) { loc = l; }
+    void dump(int indent) const override {
+        std::cout << std::string(indent, ' ') << "StringLiteral(\"" << value << "\")\n";
+    }
+};
+
 struct BoolLiteral : public Expr {
     bool value;
     BoolLiteral(bool v, Location l) : value(v) { loc = l; }
@@ -163,6 +171,15 @@ struct PrintStmt : public Stmt {
     PrintStmt(ExprPtr v, Location l) : value(std::move(v)) { loc = l; }
     void dump(int indent) const override {
         std::cout << std::string(indent, ' ') << "PrintStmt\n";
+        value->dump(indent + 2);
+    }
+};
+
+struct PrintStrStmt : public Stmt {
+    ExprPtr value;
+    PrintStrStmt(ExprPtr v, Location l) : value(std::move(v)) { loc = l; }
+    void dump(int indent) const override {
+        std::cout << std::string(indent, ' ') << "PrintStrStmt\n";
         value->dump(indent + 2);
     }
 };

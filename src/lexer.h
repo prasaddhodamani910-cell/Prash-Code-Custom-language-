@@ -9,7 +9,7 @@ namespace toy {
 
 enum class TokenType {
     // Keywords
-    DEF, IF, ELSE, WHILE, RETURN, PRINT, TRUE_LIT, FALSE_LIT,
+    DEF, IF, ELSE, WHILE, RETURN, PRINT, PRINT_STR, TRUE_LIT, FALSE_LIT,
 
     // Operators
     PLUS, MINUS, STAR, SLASH, PERCENT,
@@ -20,7 +20,7 @@ enum class TokenType {
     LPAREN, RPAREN, COMMA, COLON,
 
     // Literals & Identifiers
-    INTEGER, IDENTIFIER,
+    INTEGER, STRING, IDENTIFIER,
 
     // Special
     NEWLINE, INDENT, DEDENT, END_OF_FILE, ERROR
@@ -31,6 +31,7 @@ struct Token {
     std::string_view text;
     Location loc;
     int64_t int_val = 0; // For INTEGER
+    std::string str_val; // For STRING
 };
 
 class Lexer {

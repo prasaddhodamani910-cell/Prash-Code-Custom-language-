@@ -1,254 +1,14 @@
-#include "codegen.h"
-#include <iostream>
+import re
 
-namespace toy {
+with open('src/codegen.cpp', 'r') as f:
+    content = f.read()
 
-CodeGen::CodeGen(const std::string& outputFile) : m_outputFile(outputFile) {
-    m_out.open(outputFile);
-}
+# We want to replace from 'void CodeGen::generateStmt' to the end.
+# So we slice it out.
+idx = content.find('void CodeGen::generateStmt(Stmt* stmt)')
+head = content[:idx]
 
-void CodeGen::emit(const std::string& instr) {
-    m_out << "    " << instr << "\n";
-}
-
-void CodeGen::emitLabel(const std::string& label) {
-    m_out << label << ":\n";
-}
-
-std::string CodeGen::newLabel() {
-    return ".L" + std::to_string(m_labelCounter++);
-}
-
-void CodeGen::push(const std::string& reg) {
-    emit("str " + reg + ", [sp, #-16]!");
-}
-
-void CodeGen::pop(const std::string& reg) {
-    emit("ldr " + reg + ", [sp], #16");
-}
-
-
-std::string CodeGen::allocReg() {
-    for (int i = 0; i < 10; ++i) {
-        if (m_freeRegisters[i]) {
-            m_freeRegisters[i] = false;
-            return "x" + std::to_string(19 + i);
-        }
-    }
-    return "x19"; // Spill fallback (simplified)
-}
-
-void CodeGen::freeReg(const std::string& reg) {
-    if (reg[0] == 'x') {
-        int r = std::stoi(reg.substr(1));
-        if (r >= 19 && r <= 28) m_freeRegisters[r - 19] = true;
-    }
-}
-
-void CodeGen::enterScope() {
-    m_scopes.push_back({0});
-    m_scopeDepth++;
-}
-
-void CodeGen::leaveScope() {
-    int varsToPop = m_scopes.back().numVars;
-    if (varsToPop > 0) {
-        emit("add sp, sp, #" + std::to_string(varsToPop * 16));
-        m_currentFpOffset += varsToPop * 16;
-    }
-    
-    // Remove variables from maps
-    for (auto& pair : m_variables) {
-        if (!pair.second.empty() && pair.second.back().scopeDepth == m_scopeDepth) {
-            pair.second.pop_back();
-        }
-    }
-    
-    m_scopes.pop_back();
-    m_scopeDepth--;
-}
-
-void CodeGen::declareVar(const std::string& name) {
-    m_currentFpOffset -= 16;
-    m_variables[name].push_back({m_currentFpOffset, m_scopeDepth});
-    m_scopes.back().numVars++;
-}
-
-int CodeGen::getVarOffset(const std::string& name) {
-    auto it = m_variables.find(name);
-    if (it != m_variables.end() && !it->second.empty()) {
-        return it->second.back().offset;
-    }
-    return 0; // Should be caught by semantic analyzer
-}
-
-void CodeGen::generate(Program* program) {
-    m_out << ".arch armv8-a\n";
-    m_out << ".text\n";
-    m_out << ".align 2\n";
-    m_out << ".global _start\n\n";
-    
-    // _start routine
-    emitLabel("_start");
-    emit("bl main");
-    emit("mov x8, #93"); // exit syscall
-    // result of main is in x0
-    emit("svc #0");
-    m_out << "\n";
-
-    // print runtime
-    emitLabel("_print_int");
-    // arg is in x0
-    // print integer and newline
-    emit("stp x29, x30, [sp, #-16]!");
-    emit("mov x29, sp");
-    emit("sub sp, sp, #32"); // buffer for string
-    
-    emit("mov x1, sp");
-    emit("add x1, x1, #30"); // end of buffer
-    emit("mov w2, #10");
-    emit("strb w2, [x1]"); // newline
-    
-    emit("mov x3, x0"); // number
-    emit("cmp x3, #0");
-    emit("bge .Lprint_pos");
-    emit("neg x3, x3"); // absolute value
-    emitLabel(".Lprint_pos");
-    
-    emit("mov x4, #10"); // divisor
-    emitLabel(".Lprint_loop");
-    emit("sub x1, x1, #1");
-    emit("udiv x5, x3, x4");
-    emit("msub x6, x5, x4, x3"); // remainder
-    emit("add x6, x6, #'0'");
-    emit("strb w6, [x1]");
-    emit("mov x3, x5");
-    emit("cmp x3, #0");
-    emit("bne .Lprint_loop");
-    
-    emit("cmp x0, #0");
-    emit("bge .Lprint_done");
-    emit("sub x1, x1, #1");
-    emit("mov w2, #'-'");
-    emit("strb w2, [x1]");
-    
-    emitLabel(".Lprint_done");
-    // calculate length
-    emit("mov x2, sp");
-    emit("add x2, x2, #31");
-    emit("sub x2, x2, x1"); // length
-    
-    // write syscall
-    emit("mov x0, #1"); // stdout
-    // x1 is buffer
-    // x2 is length
-    emit("mov x8, #64");
-    emit("svc #0");
-    
-    emit("mov sp, x29");
-    emit("ldp x29, x30, [sp], #16");
-    emit("ret");
-    m_out << "\n";
-
-    emitLabel("_print_str");
-    emit("stp x29, x30, [sp, #-16]!");
-    emit("mov x29, sp");
-    emit("mov x1, x0"); // buffer
-    // length
-    emit("mov x2, #0");
-    emitLabel(".Lprint_str_loop");
-    emit("ldrb w3, [x1, x2]");
-    emit("cmp w3, #0");
-    emit("beq .Lprint_str_done");
-    emit("add x2, x2, #1");
-    emit("b .Lprint_str_loop");
-    emitLabel(".Lprint_str_done");
-    
-    emit("mov x0, #1"); // stdout
-    emit("mov x8, #64"); // write syscall
-    emit("svc #0");
-    
-    emit("ldp x29, x30, [sp], #16");
-    emit("ret");
-    m_out << "\n";
-
-    for (const auto& fn : program->functions) {
-        generateFnDecl(fn.get());
-    }
-
-    if (!m_strings.empty()) {
-        m_out << "\n.section .rodata\n";
-        m_out << ".align 3\n";
-        for (size_t i = 0; i < m_strings.size(); ++i) {
-            emitLabel(".Lstr" + std::to_string(i));
-            m_out << "    .asciz \"";
-            for (char c : m_strings[i]) {
-                if (c == '\n') m_out << "\\n";
-                else if (c == '\t') m_out << "\\t";
-                else if (c == '\\') m_out << "\\\\";
-                else if (c == '"') m_out << "\\\"";
-                else m_out << c;
-            }
-            m_out << "\"\n";
-        }
-    }
-}
-
-void CodeGen::generateFnDecl(FnDecl* fn) {
-    m_currentFunction = fn->name;
-    m_out << ".global " << fn->name << "\n";
-    emitLabel(fn->name);
-    
-    // Prologue
-    emit("stp x29, x30, [sp, #-16]!");
-    emit("mov x29, sp");
-    for (int i = 19; i <= 27; i += 2) {
-        emit("stp x" + std::to_string(i) + ", x" + std::to_string(i+1) + ", [sp, #-16]!");
-    }
-    
-    m_currentFpOffset = -80;
-    m_scopes.clear();
-    m_variables.clear();
-    
-    enterScope();
-    
-    // Handle parameters
-    // Parameters come in x0-x7. We push them to the stack to become local variables
-    for (size_t i = 0; i < fn->params.size(); ++i) {
-        emit("str x" + std::to_string(i) + ", [sp, #-16]!");
-        declareVar(fn->params[i]);
-    }
-    
-    // Body
-    for (const auto& stmt : fn->body->statements) {
-        generateStmt(stmt.get());
-    }
-    
-    // Default return 0 if no return statement hit
-    emit("mov x0, #0");
-    emitLabel(".L" + m_currentFunction + "_end");
-    
-    leaveScope();
-
-    // Epilogue
-    for (int i = 27; i >= 19; i -= 2) {
-        emit("ldp x" + std::to_string(i) + ", x" + std::to_string(i+1) + ", [sp], #16");
-    }
-    emit("mov sp, x29");
-    emit("ldp x29, x30, [sp], #16");
-    emit("ret");
-    m_out << "\n";
-}
-
-void CodeGen::generateBlock(Block* block) {
-    enterScope();
-    for (const auto& stmt : block->statements) {
-        generateStmt(stmt.get());
-    }
-    leaveScope();
-}
-
-void CodeGen::generateStmt(Stmt* stmt) {
+new_code = """void CodeGen::generateStmt(Stmt* stmt) {
     if (auto assignStmt = dynamic_cast<AssignStmt*>(stmt)) {
         std::string reg = generateExpr(assignStmt->value.get());
         if (assignStmt->isDeclaration) {
@@ -304,11 +64,6 @@ void CodeGen::generateStmt(Stmt* stmt) {
         emit("mov x0, " + reg);
         freeReg(reg);
         emit("bl _print_int");
-    } else if (auto printStrStmt = dynamic_cast<PrintStrStmt*>(stmt)) {
-        std::string reg = generateExpr(printStrStmt->value.get());
-        emit("mov x0, " + reg);
-        freeReg(reg);
-        emit("bl _print_str");
     } else if (auto exprStmt = dynamic_cast<ExprStmt*>(stmt)) {
         std::string reg = generateExpr(exprStmt->expr.get());
         freeReg(reg);
@@ -333,13 +88,6 @@ std::string CodeGen::generateExpr(Expr* expr) {
     } else if (auto boolLit = dynamic_cast<BoolLiteral*>(expr)) {
         std::string reg = allocReg();
         emit("mov " + reg + ", #" + std::to_string(boolLit->value ? 1 : 0));
-        return reg;
-    } else if (auto strLit = dynamic_cast<StringLiteral*>(expr)) {
-        std::string reg = allocReg();
-        std::string label = ".Lstr" + std::to_string(m_strings.size());
-        m_strings.push_back(strLit->value);
-        emit("adrp " + reg + ", " + label);
-        emit("add " + reg + ", " + reg + ", :lo12:" + label);
         return reg;
     } else if (auto id = dynamic_cast<Identifier*>(expr)) {
         std::string reg = allocReg();
@@ -440,3 +188,8 @@ std::string CodeGen::generateExpr(Expr* expr) {
 }
 
 } // namespace toy
+"""
+
+with open('src/codegen.cpp', 'w') as f:
+    f.write(head + new_code)
+

@@ -12,6 +12,7 @@ const char* tokenTypeToString(TokenType type) {
         case TokenType::WHILE: return "WHILE";
         case TokenType::RETURN: return "RETURN";
         case TokenType::PRINT: return "PRINT";
+        case TokenType::PRINT_STR: return "PRINT_STR";
         case TokenType::TRUE_LIT: return "TRUE_LIT";
         case TokenType::FALSE_LIT: return "FALSE_LIT";
         case TokenType::PLUS: return "PLUS";
@@ -34,6 +35,7 @@ const char* tokenTypeToString(TokenType type) {
         case TokenType::COMMA: return "COMMA";
         case TokenType::COLON: return "COLON";
         case TokenType::INTEGER: return "INTEGER";
+        case TokenType::STRING: return "STRING";
         case TokenType::IDENTIFIER: return "IDENTIFIER";
         case TokenType::NEWLINE: return "NEWLINE";
         case TokenType::INDENT: return "INDENT";
@@ -145,6 +147,41 @@ std::vector<Token> Lexer::tokenize() {
         }
         if (std::isdigit(c)) {
             tokens.push_back(number());
+            continue;
+        }
+
+        if (c == '"') {
+            std::string str_val;
+            bool closed = false;
+            while (peek() != '\0') {
+                char nc = peek();
+                if (nc == '\n') {
+                    m_reporter.error({m_line, m_column}, "Unterminated string literal");
+                    break;
+                }
+                if (nc == '"') {
+                    advance(); // consume closing quote
+                    closed = true;
+                    break;
+                }
+                if (nc == '\\') {
+                    advance(); // consume backslash
+                    char escape = peek();
+                    if (escape == 'n') { str_val += '\n'; advance(); }
+                    else if (escape == 't') { str_val += '\t'; advance(); }
+                    else if (escape == '\\') { str_val += '\\'; advance(); }
+                    else if (escape == '"') { str_val += '"'; advance(); }
+                    else { str_val += escape; advance(); }
+                } else {
+                    str_val += advance();
+                }
+            }
+            if (!closed) {
+                m_reporter.error({m_line, m_column}, "Unterminated string literal");
+            }
+            Token t = makeToken(TokenType::STRING);
+            t.str_val = str_val;
+            tokens.push_back(t);
             continue;
         }
 
@@ -270,6 +307,7 @@ Token Lexer::identifier() {
     else if (text == "while") type = TokenType::WHILE;
     else if (text == "return") type = TokenType::RETURN;
     else if (text == "print") type = TokenType::PRINT;
+    else if (text == "print_str") type = TokenType::PRINT_STR;
     else if (text == "true") type = TokenType::TRUE_LIT;
     else if (text == "false") type = TokenType::FALSE_LIT;
 
