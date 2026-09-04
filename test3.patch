@@ -1,7 +1,0 @@
---- src/parser.cpp
-+++ src/parser.cpp
-@@ -10,6 +10,7 @@
- std::unique_ptr<Program> Parser::parse() {
-     auto program = std::make_unique<Program>();
-+    fprintf(stderr, "DEBUG: tokens size = %zu\n", m_tokens.size());
-     while (!check(TokenType::END_OF_FILE)) {
