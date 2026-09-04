@@ -27,6 +27,24 @@ void CodeGen::pop(const std::string& reg) {
     emit("ldr " + reg + ", [sp], #16");
 }
 
+
+std::string CodeGen::allocReg() {
+    for (int i = 0; i < 10; ++i) {
+        if (m_freeRegisters[i]) {
+            m_freeRegisters[i] = false;
+            return "x" + std::to_string(19 + i);
+        }
+    }
+    return "x19"; // Spill fallback (simplified)
+}
+
+void CodeGen::freeReg(const std::string& reg) {
+    if (reg[0] == 'x') {
+        int r = std::stoi(reg.substr(1));
+        if (r >= 19 && r <= 28) m_freeRegisters[r - 19] = true;
+    }
+}
+
 void CodeGen::enterScope() {
     m_scopes.push_back({0});
     m_scopeDepth++;
@@ -145,8 +163,11 @@ void CodeGen::generateFnDecl(FnDecl* fn) {
     // Prologue
     emit("stp x29, x30, [sp, #-16]!");
     emit("mov x29, sp");
+    for (int i = 19; i <= 27; i += 2) {
+        emit("stp x" + std::to_string(i) + ", x" + std::to_string(i+1) + ", [sp, #-16]!");
+    }
     
-    m_currentFpOffset = 0;
+    m_currentFpOffset = -80;
     m_scopes.clear();
     m_variables.clear();
     
@@ -171,6 +192,9 @@ void CodeGen::generateFnDecl(FnDecl* fn) {
     leaveScope();
 
     // Epilogue
+    for (int i = 27; i >= 19; i -= 2) {
+        emit("ldp x" + std::to_string(i) + ", x" + std::to_string(i+1) + ", [sp], #16");
+    }
     emit("mov sp, x29");
     emit("ldp x29, x30, [sp], #16");
     emit("ret");
@@ -187,20 +211,22 @@ void CodeGen::generateBlock(Block* block) {
 
 void CodeGen::generateStmt(Stmt* stmt) {
     if (auto assignStmt = dynamic_cast<AssignStmt*>(stmt)) {
-        generateExpr(assignStmt->value.get());
+        std::string reg = generateExpr(assignStmt->value.get());
         if (assignStmt->isDeclaration) {
-            push("x0"); // Save value on stack as local variable
+            push(reg); // Save value on stack as local variable
             declareVar(assignStmt->name);
         } else {
             int offset = getVarOffset(assignStmt->name);
-            emit("str x0, [x29, #" + std::to_string(offset) + "]");
+            emit("str " + reg + ", [x29, #" + std::to_string(offset) + "]");
         }
+        freeReg(reg);
     } else if (auto ifStmt = dynamic_cast<IfStmt*>(stmt)) {
-        generateExpr(ifStmt->condition.get());
+        std::string reg = generateExpr(ifStmt->condition.get());
         std::string elseLabel = newLabel();
         std::string endLabel = newLabel();
         
-        emit("cmp x0, #0");
+        emit("cmp " + reg + ", #0");
+        freeReg(reg);
         if (ifStmt->elseBranch) {
             emit("beq " + elseLabel);
             generateStmt(ifStmt->thenBranch.get());
@@ -218,93 +244,103 @@ void CodeGen::generateStmt(Stmt* stmt) {
         std::string endLabel = newLabel();
         
         emitLabel(startLabel);
-        generateExpr(whileStmt->condition.get());
-        emit("cmp x0, #0");
+        std::string reg = generateExpr(whileStmt->condition.get());
+        emit("cmp " + reg + ", #0");
+        freeReg(reg);
         emit("beq " + endLabel);
         generateStmt(whileStmt->body.get());
         emit("b " + startLabel);
         emitLabel(endLabel);
     } else if (auto retStmt = dynamic_cast<ReturnStmt*>(stmt)) {
         if (retStmt->value) {
-            generateExpr(retStmt->value.get());
+            std::string reg = generateExpr(retStmt->value.get());
+            emit("mov x0, " + reg);
+            freeReg(reg);
         } else {
             emit("mov x0, #0");
         }
         emit("b .L" + m_currentFunction + "_end");
     } else if (auto printStmt = dynamic_cast<PrintStmt*>(stmt)) {
-        generateExpr(printStmt->value.get());
+        std::string reg = generateExpr(printStmt->value.get());
+        emit("mov x0, " + reg);
+        freeReg(reg);
         emit("bl _print_int");
     } else if (auto exprStmt = dynamic_cast<ExprStmt*>(stmt)) {
-        generateExpr(exprStmt->expr.get());
+        std::string reg = generateExpr(exprStmt->expr.get());
+        freeReg(reg);
     } else if (auto blockStmt = dynamic_cast<Block*>(stmt)) {
         generateBlock(blockStmt);
     }
 }
 
-void CodeGen::generateExpr(Expr* expr) {
+std::string CodeGen::generateExpr(Expr* expr) {
     if (auto intLit = dynamic_cast<IntLiteral*>(expr)) {
-        // Load immediate, might need multiple instructions if large
+        std::string reg = allocReg();
         uint64_t val = (uint64_t)intLit->value;
         if (val <= 0xFFFF) {
-            emit("mov x0, #" + std::to_string(val));
+            emit("mov " + reg + ", #" + std::to_string(val));
         } else {
-            emit("movz x0, #" + std::to_string(val & 0xFFFF));
-            if ((val >> 16) & 0xFFFF) emit("movk x0, #" + std::to_string((val >> 16) & 0xFFFF) + ", lsl #16");
-            if ((val >> 32) & 0xFFFF) emit("movk x0, #" + std::to_string((val >> 32) & 0xFFFF) + ", lsl #32");
-            if ((val >> 48) & 0xFFFF) emit("movk x0, #" + std::to_string((val >> 48) & 0xFFFF) + ", lsl #48");
+            emit("movz " + reg + ", #" + std::to_string(val & 0xFFFF));
+            if ((val >> 16) & 0xFFFF) emit("movk " + reg + ", #" + std::to_string((val >> 16) & 0xFFFF) + ", lsl #16");
+            if ((val >> 32) & 0xFFFF) emit("movk " + reg + ", #" + std::to_string((val >> 32) & 0xFFFF) + ", lsl #32");
+            if ((val >> 48) & 0xFFFF) emit("movk " + reg + ", #" + std::to_string((val >> 48) & 0xFFFF) + ", lsl #48");
         }
+        return reg;
     } else if (auto boolLit = dynamic_cast<BoolLiteral*>(expr)) {
-        emit("mov x0, #" + std::to_string(boolLit->value ? 1 : 0));
+        std::string reg = allocReg();
+        emit("mov " + reg + ", #" + std::to_string(boolLit->value ? 1 : 0));
+        return reg;
     } else if (auto id = dynamic_cast<Identifier*>(expr)) {
+        std::string reg = allocReg();
         int offset = getVarOffset(id->name);
-        emit("ldr x0, [x29, #" + std::to_string(offset) + "]");
+        emit("ldr " + reg + ", [x29, #" + std::to_string(offset) + "]");
+        return reg;
     } else if (auto binExpr = dynamic_cast<BinaryExpr*>(expr)) {
         if (binExpr->op == TokenType::AND) {
-            generateExpr(binExpr->left.get());
+            std::string reg = generateExpr(binExpr->left.get());
             std::string falseLabel = newLabel();
             std::string endLabel = newLabel();
-            emit("cmp x0, #0");
+            emit("cmp " + reg + ", #0");
             emit("beq " + falseLabel);
-            generateExpr(binExpr->right.get());
-            emit("cmp x0, #0");
+            std::string rightReg = generateExpr(binExpr->right.get());
+            emit("cmp " + rightReg + ", #0");
             emit("beq " + falseLabel);
-            emit("mov x0, #1");
+            emit("mov " + reg + ", #1");
             emit("b " + endLabel);
             emitLabel(falseLabel);
-            emit("mov x0, #0");
+            emit("mov " + reg + ", #0");
             emitLabel(endLabel);
-            return;
+            freeReg(rightReg);
+            return reg;
         } else if (binExpr->op == TokenType::OR) {
-            generateExpr(binExpr->left.get());
+            std::string reg = generateExpr(binExpr->left.get());
             std::string trueLabel = newLabel();
             std::string endLabel = newLabel();
-            emit("cmp x0, #0");
+            emit("cmp " + reg + ", #0");
             emit("bne " + trueLabel);
-            generateExpr(binExpr->right.get());
-            emit("cmp x0, #0");
+            std::string rightReg = generateExpr(binExpr->right.get());
+            emit("cmp " + rightReg + ", #0");
             emit("bne " + trueLabel);
-            emit("mov x0, #0");
+            emit("mov " + reg + ", #0");
             emit("b " + endLabel);
             emitLabel(trueLabel);
-            emit("mov x0, #1");
+            emit("mov " + reg + ", #1");
             emitLabel(endLabel);
-            return;
+            freeReg(rightReg);
+            return reg;
         }
 
-        generateExpr(binExpr->left.get());
-        push("x0"); // Save left side
-        generateExpr(binExpr->right.get());
-        emit("mov x1, x0"); // Right side to x1
-        pop("x0"); // Restore left side to x0
+        std::string leftReg = generateExpr(binExpr->left.get());
+        std::string rightReg = generateExpr(binExpr->right.get());
         
         switch (binExpr->op) {
-            case TokenType::PLUS: emit("add x0, x0, x1"); break;
-            case TokenType::MINUS: emit("sub x0, x0, x1"); break;
-            case TokenType::STAR: emit("mul x0, x0, x1"); break;
-            case TokenType::SLASH: emit("sdiv x0, x0, x1"); break;
+            case TokenType::PLUS: emit("add " + leftReg + ", " + leftReg + ", " + rightReg); break;
+            case TokenType::MINUS: emit("sub " + leftReg + ", " + leftReg + ", " + rightReg); break;
+            case TokenType::STAR: emit("mul " + leftReg + ", " + leftReg + ", " + rightReg); break;
+            case TokenType::SLASH: emit("sdiv " + leftReg + ", " + leftReg + ", " + rightReg); break;
             case TokenType::PERCENT:
-                emit("sdiv x2, x0, x1");
-                emit("msub x0, x2, x1, x0");
+                emit("sdiv x2, " + leftReg + ", " + rightReg);
+                emit("msub " + leftReg + ", x2, " + rightReg + ", " + leftReg);
                 break;
             case TokenType::EQ:
             case TokenType::NEQ:
@@ -312,38 +348,44 @@ void CodeGen::generateExpr(Expr* expr) {
             case TokenType::LTE:
             case TokenType::GT:
             case TokenType::GTE:
-                emit("cmp x0, x1");
-                if (binExpr->op == TokenType::EQ) emit("cset x0, eq");
-                else if (binExpr->op == TokenType::NEQ) emit("cset x0, ne");
-                else if (binExpr->op == TokenType::LT) emit("cset x0, lt");
-                else if (binExpr->op == TokenType::LTE) emit("cset x0, le");
-                else if (binExpr->op == TokenType::GT) emit("cset x0, gt");
-                else if (binExpr->op == TokenType::GTE) emit("cset x0, ge");
+                emit("cmp " + leftReg + ", " + rightReg);
+                if (binExpr->op == TokenType::EQ) emit("cset " + leftReg + ", eq");
+                else if (binExpr->op == TokenType::NEQ) emit("cset " + leftReg + ", ne");
+                else if (binExpr->op == TokenType::LT) emit("cset " + leftReg + ", lt");
+                else if (binExpr->op == TokenType::LTE) emit("cset " + leftReg + ", le");
+                else if (binExpr->op == TokenType::GT) emit("cset " + leftReg + ", gt");
+                else if (binExpr->op == TokenType::GTE) emit("cset " + leftReg + ", ge");
                 break;
             default: break;
         }
+        freeReg(rightReg);
+        return leftReg;
     } else if (auto unExpr = dynamic_cast<UnaryExpr*>(expr)) {
-        generateExpr(unExpr->right.get());
+        std::string reg = generateExpr(unExpr->right.get());
         if (unExpr->op == TokenType::MINUS) {
-            emit("neg x0, x0");
+            emit("neg " + reg + ", " + reg);
         } else if (unExpr->op == TokenType::NOT) {
-            emit("cmp x0, #0");
-            emit("cset x0, eq");
+            emit("cmp " + reg + ", #0");
+            emit("cset " + reg + ", eq");
         }
+        return reg;
     } else if (auto callExpr = dynamic_cast<CallExpr*>(expr)) {
-        // Evaluate arguments and push them
+        std::vector<std::string> argRegs;
         for (const auto& arg : callExpr->args) {
-            generateExpr(arg.get());
-            push("x0");
+            argRegs.push_back(generateExpr(arg.get()));
         }
         
-        // Pop into registers x0-x7 (in reverse order)
-        for (int i = (int)callExpr->args.size() - 1; i >= 0; --i) {
-            pop("x" + std::to_string(i));
+        for (size_t i = 0; i < callExpr->args.size(); ++i) {
+            emit("mov x" + std::to_string(i) + ", " + argRegs[i]);
+            freeReg(argRegs[i]);
         }
         
         emit("bl " + callExpr->callee);
+        std::string resReg = allocReg();
+        emit("mov " + resReg + ", x0");
+        return resReg;
     }
+    return allocReg();
 }
 
 } // namespace toy
