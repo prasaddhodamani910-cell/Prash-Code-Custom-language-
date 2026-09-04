@@ -186,14 +186,15 @@ void CodeGen::generateBlock(Block* block) {
 }
 
 void CodeGen::generateStmt(Stmt* stmt) {
-    if (auto letStmt = dynamic_cast<LetStmt*>(stmt)) {
-        generateExpr(letStmt->initializer.get());
-        push("x0"); // Save value on stack as local variable
-        declareVar(letStmt->name);
-    } else if (auto assignStmt = dynamic_cast<AssignStmt*>(stmt)) {
+    if (auto assignStmt = dynamic_cast<AssignStmt*>(stmt)) {
         generateExpr(assignStmt->value.get());
-        int offset = getVarOffset(assignStmt->name);
-        emit("str x0, [x29, #" + std::to_string(offset) + "]");
+        if (assignStmt->isDeclaration) {
+            push("x0"); // Save value on stack as local variable
+            declareVar(assignStmt->name);
+        } else {
+            int offset = getVarOffset(assignStmt->name);
+            emit("str x0, [x29, #" + std::to_string(offset) + "]");
+        }
     } else if (auto ifStmt = dynamic_cast<IfStmt*>(stmt)) {
         generateExpr(ifStmt->condition.get());
         std::string elseLabel = newLabel();

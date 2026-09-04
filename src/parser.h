@@ -9,7 +9,7 @@ namespace toy {
 
 class Parser {
 public:
-    Parser(const std::vector<Token>& tokens, ErrorReporter& reporter);
+    Parser(std::vector<Token> tokens, ErrorReporter& reporter);
     std::unique_ptr<Program> parse();
 
 private:
@@ -42,7 +42,7 @@ private:
     Token consume(TokenType type, std::string_view message);
     void synchronize();
 
-    const std::vector<Token>& m_tokens;
+    std::vector<Token> m_tokens;
     ErrorReporter& m_reporter;
     size_t m_current = 0;
 };

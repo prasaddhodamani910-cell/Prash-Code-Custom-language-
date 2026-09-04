@@ -100,20 +100,10 @@ struct Stmt {
     Location loc;
 };
 
-struct LetStmt : public Stmt {
-    std::string name;
-    ExprPtr initializer;
-    LetStmt(std::string n, ExprPtr init, Location l) 
-        : name(std::move(n)), initializer(std::move(init)) { loc = l; }
-    void dump(int indent) const override {
-        std::cout << std::string(indent, ' ') << "LetStmt(" << name << ")\n";
-        initializer->dump(indent + 2);
-    }
-};
-
 struct AssignStmt : public Stmt {
     std::string name;
     ExprPtr value;
+    bool isDeclaration = false;
     AssignStmt(std::string n, ExprPtr v, Location l) 
         : name(std::move(n)), value(std::move(v)) { loc = l; }
     void dump(int indent) const override {

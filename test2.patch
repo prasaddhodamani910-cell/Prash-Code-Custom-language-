@@ -1,0 +1,14 @@
+--- src/parser.cpp
++++ src/parser.cpp
+@@ -11,7 +11,10 @@
+     while (!check(TokenType::END_OF_FILE)) {
+         if (match(TokenType::NEWLINE)) continue; // ignore stray newlines
+         try {
+-            program->functions.push_back(parseFnDecl());
++            auto fn = parseFnDecl();
++            if (fn) {
++                program->functions.push_back(std::move(fn));
++            }
+         } catch (const std::exception& e) {
+             fprintf(stderr, "Caught exception: %s\n", e.what());
+             synchronize();

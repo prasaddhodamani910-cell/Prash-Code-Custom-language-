@@ -1,16 +1,12 @@
-// Factorial using recursion
-fn factorial(n) {
-    if (n <= 1) {
-        return 1;
-    }
-    return n * factorial(n - 1);
-}
+# Factorial using recursion
+def factorial(n):
+    if n <= 1:
+        return 1
+    return n * factorial(n - 1)
 
-fn main() {
-    let i = 1;
-    while (i <= 12) {
-        print(factorial(i));
-        i = i + 1;
-    }
-    return 0;
-}
+def main():
+    i = 1
+    while i <= 12:
+        print(factorial(i))
+        i = i + 1
+    return 0

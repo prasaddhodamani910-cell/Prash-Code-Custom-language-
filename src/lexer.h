@@ -9,7 +9,7 @@ namespace toy {
 
 enum class TokenType {
     // Keywords
-    LET, FN, IF, ELSE, WHILE, RETURN, PRINT, TRUE_LIT, FALSE_LIT,
+    DEF, IF, ELSE, WHILE, RETURN, PRINT, TRUE_LIT, FALSE_LIT,
 
     // Operators
     PLUS, MINUS, STAR, SLASH, PERCENT,
@@ -17,14 +17,13 @@ enum class TokenType {
     AND, OR, NOT,
 
     // Punctuation
-    LPAREN, RPAREN, LBRACE, RBRACE,
-    COMMA, SEMICOLON,
+    LPAREN, RPAREN, COMMA, COLON,
 
     // Literals & Identifiers
     INTEGER, IDENTIFIER,
 
     // Special
-    END_OF_FILE, ERROR
+    NEWLINE, INDENT, DEDENT, END_OF_FILE, ERROR
 };
 
 struct Token {
@@ -56,6 +55,8 @@ private:
     int m_line = 1;
     int m_column = 1;
     int m_startColumn = 1;
+    std::vector<int> m_indentStack;
+    bool m_isAtLineStart = true;
 };
 
 const char* tokenTypeToString(TokenType type);

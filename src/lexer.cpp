@@ -6,8 +6,7 @@ namespace toy {
 
 const char* tokenTypeToString(TokenType type) {
     switch (type) {
-        case TokenType::LET: return "LET";
-        case TokenType::FN: return "FN";
+        case TokenType::DEF: return "DEF";
         case TokenType::IF: return "IF";
         case TokenType::ELSE: return "ELSE";
         case TokenType::WHILE: return "WHILE";
@@ -32,12 +31,13 @@ const char* tokenTypeToString(TokenType type) {
         case TokenType::NOT: return "NOT";
         case TokenType::LPAREN: return "LPAREN";
         case TokenType::RPAREN: return "RPAREN";
-        case TokenType::LBRACE: return "LBRACE";
-        case TokenType::RBRACE: return "RBRACE";
         case TokenType::COMMA: return "COMMA";
-        case TokenType::SEMICOLON: return "SEMICOLON";
+        case TokenType::COLON: return "COLON";
         case TokenType::INTEGER: return "INTEGER";
         case TokenType::IDENTIFIER: return "IDENTIFIER";
+        case TokenType::NEWLINE: return "NEWLINE";
+        case TokenType::INDENT: return "INDENT";
+        case TokenType::DEDENT: return "DEDENT";
         case TokenType::END_OF_FILE: return "END_OF_FILE";
         case TokenType::ERROR: return "ERROR";
         default: return "UNKNOWN";
@@ -45,22 +45,100 @@ const char* tokenTypeToString(TokenType type) {
 }
 
 Lexer::Lexer(std::string_view source, ErrorReporter& reporter)
-    : m_source(source), m_reporter(reporter) {}
+    : m_source(source), m_reporter(reporter) {
+    m_indentStack.push_back(0);
+}
 
 std::vector<Token> Lexer::tokenize() {
     std::vector<Token> tokens;
+
     while (true) {
+        if (m_isAtLineStart) {
+            int spaces = 0;
+            while (peek() == ' ' || peek() == '\t') {
+                if (peek() == '\t') spaces += 4;
+                else spaces += 1;
+                advance();
+            }
+
+            if (peek() == '\n' || peek() == '\r' || peek() == '#') {
+                // Ignore empty lines or lines with only comments.
+                // We let skipWhitespace skip the comment, but not the newline!
+            } else if (peek() == '\0') {
+                // EOF on a line start, handled later
+            } else {
+                m_isAtLineStart = false;
+
+                if (spaces > m_indentStack.back()) {
+                    m_indentStack.push_back(spaces);
+                    Token t;
+                    t.type = TokenType::INDENT;
+                    t.text = "";
+                    t.loc = {m_line, m_column};
+                    tokens.push_back(t);
+                } else if (spaces < m_indentStack.back()) {
+                    while (spaces < m_indentStack.back()) {
+                        m_indentStack.pop_back();
+                        Token t;
+                        t.type = TokenType::DEDENT;
+                        t.text = "";
+                        t.loc = {m_line, m_column};
+                        tokens.push_back(t);
+                    }
+                    if (spaces != m_indentStack.back()) {
+                        m_reporter.error({m_line, m_column}, "Indentation error");
+                    }
+                }
+            }
+        }
+
         skipWhitespace();
         m_start = m_current;
         m_startColumn = m_column;
 
         if (m_current >= m_source.length()) {
+            if (tokens.size() > 0 && 
+                tokens.back().type != TokenType::NEWLINE && 
+                tokens.back().type != TokenType::INDENT && 
+                tokens.back().type != TokenType::DEDENT) {
+                Token t;
+                t.type = TokenType::NEWLINE;
+                t.text = "";
+                t.loc = {m_line, m_column};
+                tokens.push_back(t);
+            }
+            while (m_indentStack.size() > 1) {
+                m_indentStack.pop_back();
+                Token t;
+                t.type = TokenType::DEDENT;
+                t.text = "";
+                t.loc = {m_line, m_column};
+                tokens.push_back(t);
+            }
             tokens.push_back(makeToken(TokenType::END_OF_FILE));
             break;
         }
 
         char c = advance();
 
+        if (c == '\n') {
+            m_isAtLineStart = true;
+            m_line++;
+            m_column = 1;
+            
+            if (!tokens.empty() && 
+                tokens.back().type != TokenType::NEWLINE && 
+                tokens.back().type != TokenType::INDENT && 
+                tokens.back().type != TokenType::DEDENT) {
+                Token t;
+                t.type = TokenType::NEWLINE;
+                t.text = "";
+                t.loc = {m_line - 1, m_startColumn};
+                tokens.push_back(t);
+            }
+            continue;
+        }
+        
         if (std::isalpha(c) || c == '_') {
             tokens.push_back(identifier());
             continue;
@@ -73,10 +151,8 @@ std::vector<Token> Lexer::tokenize() {
         switch (c) {
             case '(': tokens.push_back(makeToken(TokenType::LPAREN)); break;
             case ')': tokens.push_back(makeToken(TokenType::RPAREN)); break;
-            case '{': tokens.push_back(makeToken(TokenType::LBRACE)); break;
-            case '}': tokens.push_back(makeToken(TokenType::RBRACE)); break;
             case ',': tokens.push_back(makeToken(TokenType::COMMA)); break;
-            case ';': tokens.push_back(makeToken(TokenType::SEMICOLON)); break;
+            case ':': tokens.push_back(makeToken(TokenType::COLON)); break;
             case '+': tokens.push_back(makeToken(TokenType::PLUS)); break;
             case '-': tokens.push_back(makeToken(TokenType::MINUS)); break;
             case '*': tokens.push_back(makeToken(TokenType::STAR)); break;
@@ -109,6 +185,8 @@ std::vector<Token> Lexer::tokenize() {
                     m_reporter.error({m_line, m_column - 1}, "Expected '|' after '|'");
                     tokens.push_back(makeToken(TokenType::ERROR));
                 }
+                break;
+            case '\r':
                 break;
             default:
                 m_reporter.error({m_line, m_column - 1}, std::string("Unexpected character: ") + c);
@@ -147,24 +225,12 @@ void Lexer::skipWhitespace() {
         char c = peek();
         switch (c) {
             case ' ':
-            case '\r':
             case '\t':
                 advance();
                 break;
-            case '\n':
-                m_line++;
-                m_column = 0; // Will become 1 after advance() increments it? Wait.
-                // Actually, if we hit \n, advance() increments m_column. So we just reset it here.
-                m_current++;
-                m_column = 1;
-                break;
-            case '/':
-                if (peekNext() == '/') {
-                    while (peek() != '\n' && peek() != '\0') {
-                        advance();
-                    }
-                } else {
-                    return;
+            case '#':
+                while (peek() != '\n' && peek() != '\0') {
+                    advance();
                 }
                 break;
             default:
@@ -198,8 +264,7 @@ Token Lexer::identifier() {
     std::string_view text = m_source.substr(m_start, m_current - m_start);
     TokenType type = TokenType::IDENTIFIER;
     
-    if (text == "let") type = TokenType::LET;
-    else if (text == "fn") type = TokenType::FN;
+    if (text == "def") type = TokenType::DEF;
     else if (text == "if") type = TokenType::IF;
     else if (text == "else") type = TokenType::ELSE;
     else if (text == "while") type = TokenType::WHILE;

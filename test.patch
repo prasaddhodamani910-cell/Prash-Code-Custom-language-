@@ -1,0 +1,15 @@
+--- src/parser.cpp
++++ src/parser.cpp
+@@ -1,4 +1,5 @@
+ #include "parser.h"
++#include <stdexcept>
+ 
+ namespace toy {
+ 
+@@ -218,6 +219,7 @@
+ Token Parser::consume(TokenType type, std::string_view message) {
+     if (check(type)) return advance();
+     m_reporter.error(peek().loc, message);
+-    return peek();
++    throw std::runtime_error("ParseError");
+ }

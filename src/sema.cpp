@@ -5,7 +5,6 @@ namespace toy {
 Sema::Sema(ErrorReporter& reporter) : m_reporter(reporter) {}
 
 void Sema::analyze(Program* program) {
-    // Register all functions first
     for (const auto& fn : program->functions) {
         if (m_functions.count(fn->name)) {
             m_reporter.error(fn->loc, "Function '" + fn->name + "' already defined");
@@ -14,7 +13,6 @@ void Sema::analyze(Program* program) {
         }
     }
     
-    // Builtin functions
     m_functions["print"] = 1;
 
     for (const auto& fn : program->functions) {
@@ -42,12 +40,23 @@ void Sema::visitBlock(Block* block) {
 }
 
 void Sema::visitStmt(Stmt* stmt) {
-    if (auto letStmt = dynamic_cast<LetStmt*>(stmt)) {
-        visitExpr(letStmt->initializer.get());
-        declareVariable(letStmt->name, letStmt->loc);
-    } else if (auto assignStmt = dynamic_cast<AssignStmt*>(stmt)) {
+    if (auto assignStmt = dynamic_cast<AssignStmt*>(stmt)) {
         visitExpr(assignStmt->value.get());
-        resolveVariable(assignStmt->name, assignStmt->loc);
+        
+        bool found = false;
+        for (auto it = m_scopes.rbegin(); it != m_scopes.rend(); ++it) {
+            if (it->count(assignStmt->name)) {
+                found = true;
+                break;
+            }
+        }
+        
+        if (!found) {
+            declareVariable(assignStmt->name, assignStmt->loc);
+            assignStmt->isDeclaration = true;
+        } else {
+            assignStmt->isDeclaration = false;
+        }
     } else if (auto ifStmt = dynamic_cast<IfStmt*>(stmt)) {
         visitExpr(ifStmt->condition.get());
         visitStmt(ifStmt->thenBranch.get());
