@@ -1,12 +1,15 @@
-# Build artifacts
+# Build artifacts and compiled binaries
 build/
-prashc
 *.o
+*.d
 *.s
 a.out
 
-# Example binaries
+# Test and example binaries
 hello
+hello.o
+hello.s
+factorial.s
 fib
 fact
 fizzbuzz

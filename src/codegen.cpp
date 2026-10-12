@@ -35,8 +35,10 @@ std::string CodeGen::allocReg() {
             return "x" + std::to_string(19 + i);
         }
     }
+    std::cerr << "Warning: Register allocation pool exhausted (x19-x28); reusing x19 without spilling (may cause register clobbering)\n";
     return "x19"; // Spill fallback (simplified)
 }
+
 
 void CodeGen::freeReg(const std::string& reg) {
     if (reg[0] == 'x') {
@@ -217,6 +219,9 @@ void CodeGen::generateFnDecl(FnDecl* fn) {
     m_currentFpOffset = -80;
     m_scopes.clear();
     m_variables.clear();
+    for (int i = 0; i < 10; ++i) {
+        m_freeRegisters[i] = true;
+    }
     
     enterScope();
     

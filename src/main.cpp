@@ -23,6 +23,19 @@ void printUsage() {
               << "  -o <file>      Specify output executable name (default: a.out)\n";
 }
 
+static std::string quoteShellArg(const std::string& arg) {
+    std::string quoted = "'";
+    for (char c : arg) {
+        if (c == '\'') {
+            quoted += "'\\''";
+        } else {
+            quoted += c;
+        }
+    }
+    quoted += "'";
+    return quoted;
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         printUsage();
@@ -115,8 +128,18 @@ int main(int argc, char** argv) {
     }
 
     // Assemble and link
-    std::string assembleCmd = "clang -c " + asmFile + " -o " + inputFile + ".o";
-    std::string linkCmd = "ld.lld -e _start -o " + outputFile + " " + inputFile + ".o";
+    std::string objFile = inputFile + ".o";
+    std::string targetFlag = "";
+    if (const char* envTarget = std::getenv("PRASHC_TARGET")) {
+        targetFlag = std::string("--target=") + envTarget + " ";
+    }
+#if !defined(__aarch64__)
+    else {
+        targetFlag = "--target=aarch64-linux-gnu ";
+    }
+#endif
+    std::string assembleCmd = "clang " + targetFlag + "-c " + quoteShellArg(asmFile) + " -o " + quoteShellArg(objFile);
+    std::string linkCmd = "ld.lld -e _start -o " + quoteShellArg(outputFile) + " " + quoteShellArg(objFile);
     
     if (std::system(assembleCmd.c_str()) != 0) {
         std::cerr << "Error assembling\n";
@@ -129,7 +152,7 @@ int main(int argc, char** argv) {
     
     // Clean up temp files
     std::remove(asmFile.c_str());
-    std::remove((inputFile + ".o").c_str());
+    std::remove(objFile.c_str());
 
     return 0;
 }

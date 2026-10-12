@@ -24,7 +24,7 @@ $(TARGET): $(OBJS)
 -include $(DEPS)
 
 clean:
-	rm -rf $(BUILDDIR) examples/*.s hello fib fact fizzbuzz scope a.out
+	rm -rf $(BUILDDIR) examples/*.s hello fib fact fizzbuzz scope a.out hello.o hello.s factorial.s
 
 test: all
 	bash run_tests.sh

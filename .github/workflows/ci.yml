@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up AArch64 cross-compilation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            llvm \
+            lld \
+            make \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu \
+            qemu-user-static \
+            binfmt-support
+          # Enable binfmt_misc for transparent aarch64 binary execution via QEMU
+          sudo systemctl restart systemd-binfmt.service || true
+          if [ -f /proc/sys/fs/binfmt_misc/register ]; then
+            sudo update-binfmts --enable qemu-aarch64 || true
+          fi
+
+      - name: Build project
+        run: make
+
+      - name: Run tests
+        run: bash run_tests.sh
